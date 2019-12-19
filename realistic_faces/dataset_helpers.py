@@ -17,4 +17,5 @@ def load_image(filename):
     img = tf.io.read_file(filename)
     img = tf.image.decode_png(img, channels=3)
     img = tf.image.convert_image_dtype(img, tf.float32)
+    img = tf.image.resize(img, [512, 512], antialias=True)
     return img

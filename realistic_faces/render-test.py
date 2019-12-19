@@ -83,7 +83,7 @@ if __name__ == '__main__':
     max_y = tf.reduce_max(tf.abs(verts_obj[:, 1]))
     max_xy = np.array([max_x, max_y]).reshape([1, 2])
     fixed_indices = tf.cast(verts_obj[:, :2] / max_xy * 256 + 256, tf.int32)
-    indices = tf.gather_nd(uv_map, fixed_indices)
+    indices = tf.gather_nd(uv_map, fixed_indices[:, :, ::-1])  # xy to yx
 
     light_direction = tf.linalg.l2_normalize([1., -0.3, -0.5])
     pixels = dirt.rasterise_deferred(
