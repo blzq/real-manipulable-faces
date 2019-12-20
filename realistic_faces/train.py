@@ -48,7 +48,7 @@ def train_step(input_image, generator, discriminator,
     gen_optimizer.apply_gradients(zip(generator_gradients, generator.trainable_variables))
     disc_optimizer.apply_gradients(zip(discriminator_gradients, discriminator.trainable_variables))
 
-    return gen_loss, disc_loss, textured_face
+    return gen_loss, disc_loss, textured_face, pncc, texture
 
 
 def fit(train_ds, epochs,
@@ -66,7 +66,7 @@ def fit(train_ds, epochs,
             print('.', end='')
             if (n + 1) % 100 == 0:
                 print()
-            gen_loss, disc_loss, textured_face = train_step(
+            gen_loss, disc_loss, textured_face, pncc, texture = train_step(
                 input_image, generator, discriminator, gen_optimizer, disc_optimizer, 
                 shape_mean, shape_basis, expr_basis, mesh_faces)
             avg_gen_loss.update_state(gen_loss)
@@ -81,6 +81,8 @@ def fit(train_ds, epochs,
                     avg_disc_loss.reset_states()
                     if tf.equal(step % 100, 0):
                         tf.summary.image('Generator output', textured_face, step=step)
+                        tf.summary.image('PNCC preview', pncc, step=step)
+                        tf.summary.image('texture preview', texture, step=step)
 
             if tf.equal(step % 10000, 0):
                 checkpoint.save(file_prefix=checkpoint_path)
@@ -94,6 +96,7 @@ def fit(train_ds, epochs,
 
 if __name__ == '__main__':
     os.environ['TF_ENABLE_AUTO_MIXED_PRECISION'] = '1'
+    tf.config.optimizer.set_jit(True)
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
@@ -101,8 +104,8 @@ if __name__ == '__main__':
             # Currently, memory growth needs to be the same across GPUs
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-                logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-                print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
             print(e)
@@ -125,7 +128,7 @@ if __name__ == '__main__':
 
     ds = tf.data.Dataset.from_tensor_slices(filenames).shuffle(len(filenames))
     ds = ds.map(dataset_helpers.load_image)
-    ds = ds.shuffle(48).batch(1)
+    ds = ds.shuffle(48).batch(4)
 
     generator = model.Generator()
     discriminator = model.Discriminator()

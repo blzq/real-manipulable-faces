@@ -4,6 +4,8 @@ import dirt
 import dirt.lighting
 import dirt.matrices
 
+import normalizations as norm
+
 def downsample(filters, size, apply_batchnorm=True):
     initializer = tf.random_normal_initializer()
 
@@ -13,7 +15,7 @@ def downsample(filters, size, apply_batchnorm=True):
                                kernel_initializer=initializer))
 
     if apply_batchnorm:
-        result.add(tf.keras.layers.BatchNormalization())
+        result.add(norm.InstanceNormalization())
 
     result.add(tf.keras.layers.LeakyReLU())
 
@@ -29,10 +31,10 @@ def upsample(filters, size, apply_dropout=False):
         tf.keras.layers.Conv2D(filters, size, strides=1, padding='same',
                                kernel_initializer=initializer))
 
-    result.add(tf.keras.layers.BatchNormalization())
+    result.add(norm.InstanceNormalization())
 
     if apply_dropout:
-        result.add(tf.keras.layers.Dropout(0.5))
+        result.add(tf.keras.layers.Dropout(0.1))
 
     result.add(tf.keras.layers.LeakyReLU())
 
@@ -137,12 +139,12 @@ def gen_face_batch(shape_mean, shape_basis, expr_basis, batch_size):
         tf.reshape(shape_mean, [batch_size, -1, 3]) + \
         tf.reshape(verts_offsets, [batch_size, -1, 3])
 
-    pose_rotate = dirt.matrices.rodrigues(tf.random.normal([batch_size, 3]))
+    pose_rotate = dirt.matrices.rodrigues(tf.random.normal([batch_size, 3], stddev=0.3))
     pose_translate = dirt.matrices.translation(
-        tf.random.normal([batch_size, 3]) + tf.constant([0, 0, -5000.]))
+        tf.random.normal([batch_size, 3], stddev=2.) + tf.constant([0, 0, -5000.]))
     pose_matrix = dirt.matrices.compose(pose_rotate, pose_translate)
 
-    lights = tf.linalg.l2_normalize(tf.random.normal([batch_size, 3]) + [0., 0., -1], axis=-1)
+    lights = tf.linalg.l2_normalize(tf.random.normal([batch_size, 3], stddev=0.3) + [0., 0., -1], axis=-1)
 
     return verts, pose_matrix, lights
 
@@ -247,7 +249,7 @@ def shader_texture(gbuffer, texture, view_matrix, light_direction):
     specular_contribution = tf.reshape(specular_contribution,
                                        [batch_size, canvas_size, canvas_size, 3])
 
-    pixels = (diffuse_contribution + ambient_contribution) * mask + [0., 0., 0.3] * (1. - mask)
+    pixels = (diffuse_contribution + ambient_contribution) * mask + [0.3, 0.3, 0.3] * (1. - mask)
 
     return pixels
 
